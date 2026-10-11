@@ -1,0 +1,13 @@
+{
+  "_notice": "EXAMPLE DATA. These are real public Hyperliquid mainnet orders from a third-party wallet found in the public trade feed on 2026-10-11. They are NOT PROWZI receipts and say nothing about PROWZI. They exist only so you can see the page work. Replace them with your own wallet and order ids.",
+  "example": true,
+  "network": "mainnet",
+  "wallet": "0x348aca8e304c01f546f506d7073e90d8cf8477fd",
+  "receipts": [
+    { "id": "571115389356", "note": "EXAMPLE: order id, partially filled IOC buy" },
+    { "id": "556494079751", "note": "EXAMPLE: order id, older ETH buy" },
+    { "id": "542140909470", "note": "EXAMPLE: order id, older SOL buy" },
+    { "id": "0x5048110c000013cd8f8d7bca8eef747b", "note": "EXAMPLE: the first order again, looked up by its client order id (cloid)" }
+  ],
+  "fake_id_for_demo": { "id": "1", "note": "EXAMPLE: deliberately wrong id, expected to show not found" }
+}

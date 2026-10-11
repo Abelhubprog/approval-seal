@@ -1,0 +1,1 @@
+{"status":"order","order":{"order":{"coin":"SOL","side":"B","limitPx":"109.08","sz":"0.0","oid":542140909470,"timestamp":1789124472797,"triggerCondition":"N/A","isTrigger":false,"triggerPx":"0.0","children":[],"isPositionTpsl":false,"reduceOnly":false,"orderType":"Limit","origSz":"0.18","tif":"Ioc","cloid":null},"status":"filled","statusTimestamp":1789124472797}}

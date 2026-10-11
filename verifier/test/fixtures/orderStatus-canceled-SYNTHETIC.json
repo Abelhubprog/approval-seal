@@ -1,0 +1,19 @@
+{
+ "status": "order",
+ "order": {
+  "status": "canceled",
+  "statusTimestamp": 1,
+  "order": {
+   "coin": "ETH",
+   "side": "A",
+   "limitPx": "3000.0",
+   "sz": "0.01",
+   "oid": 7,
+   "timestamp": 1,
+   "orderType": "Limit",
+   "origSz": "0.01",
+   "tif": "Gtc",
+   "cloid": null
+  }
+ }
+}
