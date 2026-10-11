@@ -6,15 +6,133 @@ An agent proposes an action (for example, a trade). A human approves it. `approv
 
 Status: version 0.1.0, written for a hackathon. Python reference implementation plus a JavaScript port that passes the same test vectors. It has not had an external security review.
 
+## Demo
+
+**Live guided demo: https://abelhubprog.github.io/approval-seal/** (the first tab, "Demo"). Seven steps, one click each, no typing, nothing to install:
+
+1. Agent proposes: a sample order, as JSON. Labelled EXAMPLE DATA.
+2. Owner approves: one click seals it. You see the `action_hash`, the approval and the `seal`.
+3. Anyone verifies: green.
+4. Tamper: change the amount or the venue. Red, and the page names the field that changed.
+5. Forge attempt: recompute the hashes too. It looks consistent alone, but fails against the stored seal.
+6. Replay: claim the same approval twice. The second claim is rejected.
+7. Check the public record: derive the Hyperliquid client order id, then check real public orders with no login (`4 of 4 receipts verified, no login`).
+
+Each step says in plain words what it proves and what it does not. The seal proves a record is unchanged since it was sealed. It does not prove who approved, and it says nothing about profit or safety. The page runs entirely in your browser and has no dependencies. Recording the demo for a video? See [DEMO-SCRIPT.md](DEMO-SCRIPT.md).
+
+The same flow in a terminal, colored PASS and FAIL, no dependencies:
+
+```bash
+python3 examples/demo.py             # steps 1 to 6 offline, plus the public lookup recipe
+python3 examples/demo.py --online    # also checks real public Hyperliquid orders (read-only, no login)
+make demo                            # same as the first line (make demo ARGS=--online for the second)
+```
+
+`--fixed` pins the time and nonce so the output is identical on every run, and `--no-color` gives plain text. Expected output of `python3 examples/demo.py --fixed --no-color --online` (without `--fixed` the `ts`, `nonce`, `expires_at` and `seal` differ on every run, and `action_hash` stays the same):
+
+```
+approval-seal demo  (EXAMPLE DATA, no trade is placed, nothing is sent anywhere)
+
+[1/7] Agent proposes
+  {
+    "kind": "order",
+    "venue": "hyperliquid",
+    "network": "mainnet",
+    "account": "0x0000000000000000000000000000000000000001",
+    "coin": "ETH",
+    "side": "buy",
+    "size": "0.0100",
+    "limit_px": "2500.0",
+    "tif": "Ioc",
+    "reduce_only": false
+  }
+  A proposal only. Nothing is signed.
+
+[2/7] Owner approves
+  action_hash  93fb66a910eb89ae1aa761b85c98acbae4f21c636464fb59d173618f661fd1b4
+  approver     owner@example.test   ts 1790000000   nonce 0123456789abcdef0123456789abcdef   expires_at 1790000900
+  seal         09962d38b9b9f7815e54ec9dc04bbe4c49d6f583b7152175f2db6c1b4255a79c
+  The seal is saved separately as the stored seal. The approver is just a name: no signature.
+
+[3/7] Anyone verifies
+  PASS  well_formed
+  PASS  version
+  PASS  action_hash
+  PASS  seal
+  PASS  expected_seal
+  PASS  not_expired
+  PASS  not_from_future
+  VERIFIED: unchanged since sealing, matches the stored seal, not expired
+
+[4/7] Tamper
+  edit: action.size 0.0100 -> 10.0000
+  PASS  well_formed
+  PASS  version
+  FAIL  action_hash       action does not match action_hash
+  PASS  seal
+  PASS  expected_seal
+  PASS  not_expired
+  PASS  not_from_future
+  REJECTED: action_hash (as expected). Field that changed: action.size
+  edit: action.venue hyperliquid -> other-exchange.example
+  PASS  well_formed
+  PASS  version
+  FAIL  action_hash       action does not match action_hash
+  PASS  seal
+  PASS  expected_seal
+  PASS  not_expired
+  PASS  not_from_future
+  REJECTED: action_hash (as expected). Field that changed: action.venue
+
+[5/7] Forge attempt
+  recomputed hashes for action.size 10.0000
+  forged record on its own (no stored seal): PASS, but only self-consistent. Anyone can recompute hashes.
+  PASS  well_formed
+  PASS  version
+  PASS  action_hash
+  PASS  seal
+  FAIL  expected_seal     record is not the one that was approved
+  PASS  not_expired
+  PASS  not_from_future
+  stored seal  09962d38b9b9f7815e54ec9dc04bbe4c49d6f583b7152175f2db6c1b4255a79c
+  forged seal  c0c5a37725353defaed0c1ef527e34fbac30ea8bb79dd60bfe1c50cbd662c961
+  REJECTED: expected_seal (as expected). The forgery cannot match the seal stored at approval time.
+
+[6/7] Replay
+  claim 1: PASS  the executor may run the order once
+  claim 2: FAIL not_replayed  same approval again
+  REJECTED: not_replayed (as expected). One approval, one use.
+
+[7/7] Check the public record
+  client order id derived from the sealed action: 0x93fb66a910eb89ae1aa761b85c98acba
+  (0x plus the first 32 hex characters of action_hash; set it on a real order and the public record points back here)
+  EXAMPLE DATA: the example receipts are real public orders from a third-party wallet, not PROWZI receipts.
+  VERIFIED  571115389356  buy 0.2404 ETH limit 2751.9
+  VERIFIED  556494079751  buy 0.0287 ETH limit 2958.9
+  VERIFIED  542140909470  buy 0.18 SOL limit 109.08
+  VERIFIED  0x5048110c000013cd8f8d7bca8eef747b  buy 0.2404 ETH limit 2751.9
+  4 of 4 receipts verified, no login
+  derived id: NOT FOUND (as expected: the sample order was never sent to Hyperliquid)
+
+What this proves: the order is unchanged since sealing, was not replayed, and public orders can be checked with no login.
+What it does not prove: who approved (no signature in 0.1.0), or profit, or safety. Not an audit.
+All steps behaved as expected.
+```
+
+Step 7 needs network access to `api.hyperliquid.xyz`. The example receipts are real public orders from a third-party wallet. They are not PROWZI receipts and were not made with approval-seal. The sample order itself is never sent anywhere, so its derived client order id is correctly not found. Exit code 0 means every step behaved as expected.
+
 ## 60-second quickstart
 
 Python 3.8 or newer, nothing to install:
 
 ```bash
 git clone https://github.com/Abelhubprog/approval-seal && cd approval-seal
-python3 -m unittest discover -s tests      # 26 tests
+python3 -m unittest discover -s tests      # 39 tests
 node js/test.js                            # 53 checks, same vectors (optional, Node 18+)
+python3 examples/demo.py                   # the 7-step demo in your terminal, offline
 python3 examples/hyperliquid_order.py      # seal, claim, replay, tamper, all offline
+node verifier/test/verifier.test.js        # receipt checker tests (offline)
+node verifier/test/demo.test.js            # guided demo step logic tests (offline)
 ```
 
 Use it in code:
@@ -58,7 +176,7 @@ not_from_future  ok
 REJECTED: action_hash
 ```
 
-A browser verifier with a tamper button lives in the sibling `verifier/` folder (single HTML page, no backend).
+The browser page (guided demo, receipt checker, seal verifier) lives in `verifier/`, and `docs/` is the copy GitHub Pages serves (single static page, no backend, no build step).
 
 ## Specification (approval-seal/1)
 
@@ -185,9 +303,13 @@ Notes you should know:
 approval_seal/      Python package (canonical.py, seal.py, __main__.py)
 js/                 JavaScript port (approval-seal.js) and test.js
 vectors/            test_vectors.json shared by both test suites
-tests/              Python unit tests (canonicalization, vectors, tamper rejection)
-examples/           hyperliquid_order.py, order.json
+tests/              Python unit tests (canonicalization, vectors, tamper rejection, terminal demo)
+examples/           demo.py (7-step terminal demo), hyperliquid_order.py, order.json
+verifier/           the web page: Demo, Hyperliquid receipts and Approval seal tabs, plus Node tests
+docs/               copy of verifier/ (without tests) served by GitHub Pages; make docs-sync refreshes it
 tools/              gen_vectors.py
+Makefile            make test, make demo, make docs-sync, make serve
+DEMO-SCRIPT.md      shot list and narration for a 30 to 45 second screen recording
 SECURITY.md  LICENSE
 ```
 

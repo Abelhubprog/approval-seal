@@ -3,15 +3,28 @@
   var AS = window.ApprovalSeal, R = window.Receipts;
   var $ = function (id) { return document.getElementById(id); };
 
-  // ---- tabs
-  function showTab(name) {
-    ["receipts", "seal"].forEach(function (n) {
-      $("panel-" + n).hidden = n !== name;
-      $("tab-" + n).setAttribute("aria-selected", String(n === name));
+  // ---- tabs (demo, receipts, seal). Arrow keys, Home and End move between tabs.
+  var TABS = ["demo", "receipts", "seal"];
+  function showTab(name, focus) {
+    TABS.forEach(function (n) {
+      var sel = n === name;
+      $("panel-" + n).hidden = !sel;
+      $("tab-" + n).setAttribute("aria-selected", String(sel));
+      $("tab-" + n).tabIndex = sel ? 0 : -1;
     });
+    if (focus) $("tab-" + name).focus();
+    if (window.history && history.replaceState) history.replaceState(null, "", "#" + name);
   }
-  $("tab-receipts").onclick = function () { showTab("receipts"); };
-  $("tab-seal").onclick = function () { showTab("seal"); };
+  TABS.forEach(function (n, i) {
+    $("tab-" + n).onclick = function () { showTab(n); };
+    $("tab-" + n).onkeydown = function (e) {
+      var j = e.key === "ArrowRight" ? (i + 1) % TABS.length : e.key === "ArrowLeft" ? (i + TABS.length - 1) % TABS.length
+            : e.key === "Home" ? 0 : e.key === "End" ? TABS.length - 1 : -1;
+      if (j >= 0) { e.preventDefault(); showTab(TABS[j], true); }
+    };
+  });
+  var startTab = (location.hash || "").slice(1);
+  if (TABS.indexOf(startTab) >= 0) showTab(startTab);
 
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
   function fmtTime(ms) { return ms ? new Date(ms).toISOString().replace("T", " ").slice(0, 19) + " UTC" : ""; }

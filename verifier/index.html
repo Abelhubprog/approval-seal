@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Receipt verifier</title>
-<meta name="description" content="Check agent receipts against Hyperliquid's public record, and verify approval-seal records in your browser. No login, no backend.">
+<link rel="icon" href="data:,">
+<title>approval-seal: guided demo and receipt verifier</title>
+<meta name="description" content="A 7-step guided demo of approval-seal: an agent proposes, the owner approves, anyone verifies, tampering and forgery fail, and the public Hyperliquid record is checked. Runs in your browser. No login, no backend.">
 <style>
   :root { --bg:#fff; --fg:#14181f; --muted:#5b6574; --line:#d9dee6; --card:#f6f8fa; --ok:#0a6b32; --okbg:#e3f5ea; --bad:#a1260f; --badbg:#fde8e4; --warn:#7a5200; --warnbg:#fff3d6; --accent:#1f4fd8; }
   @media (prefers-color-scheme: dark) { :root { --bg:#0e1116; --fg:#e8ecf2; --muted:#9aa5b5; --line:#2a313c; --card:#151a22; --ok:#6fdc9a; --okbg:#10301f; --bad:#ff9a87; --badbg:#3a1812; --warn:#f0c46a; --warnbg:#33290d; --accent:#7ea2ff; } }
@@ -28,6 +29,7 @@
   .banner { padding:10px 12px; border-radius:8px; background:var(--warnbg); color:var(--warn); font-size:.9rem; margin:12px 0; }
   .summary { margin:18px 0 8px; padding:14px; border-radius:10px; font-size:1.15rem; font-weight:700; border:1px solid var(--line); background:var(--card); }
   .summary.ok { background:var(--okbg); color:var(--ok); border-color:var(--ok); }
+  .summary.warn { background:var(--warnbg); color:var(--warn); border-color:var(--warn); }
   .summary.bad { background:var(--badbg); color:var(--bad); border-color:var(--bad); }
   ul.list { list-style:none; margin:0; padding:0; }
   ul.list li { border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin:8px 0; background:var(--card); }
@@ -40,19 +42,182 @@
   .note { font-size:.85rem; color:var(--muted); margin-top:28px; border-top:1px solid var(--line); padding-top:14px; }
   [hidden] { display:none !important; }
   a { color:var(--accent); }
+
+  /* ---- guided demo */
+  .demo-top { display:flex; gap:8px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin:0 0 8px; }
+  .demo-top .count { margin:0; font-weight:700; }
+  .bar { height:8px; border-radius:999px; background:var(--line); overflow:hidden; }
+  .bar > span { display:block; height:100%; width:0; background:var(--accent); transition:width .25s ease; }
+  ol.dots { list-style:none; display:flex; gap:6px; margin:10px 0 16px; padding:0; }
+  ol.dots li { flex:1; min-width:0; }
+  ol.dots button { width:100%; min-height:44px; padding:4px 0; font:inherit; font-weight:700; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--muted); cursor:pointer; }
+  ol.dots button[aria-current="step"] { background:var(--accent); border-color:var(--accent); color:#fff; }
+  ol.dots button.done:not([aria-current="step"]) { background:var(--okbg); border-color:var(--ok); color:var(--ok); }
+  ol.dots button:disabled { opacity:.45; cursor:default; }
+  .step h2 { font-size:1.2rem; margin:4px 0 8px; }
+  .step h2:focus { outline:none; }
+  .step .what { margin:0 0 12px; }
+  .demo .btn, .demo-top .btn { min-height:44px; }
+  .stepnav { display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; }
+  .stepnav .next { margin-left:auto; }
+  .out { margin-top:14px; }
+  .out:empty { display:none; }
+  .kv { margin:8px 0; }
+  .kv .k { font-weight:600; font-size:.875rem; color:var(--muted); }
+  pre.json { margin:0; padding:12px; border-radius:8px; border:1px solid var(--line); background:var(--card); overflow-x:auto; font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; white-space:pre; }
+  .proof { display:grid; gap:8px; margin-top:14px; }
+  @media (min-width:640px) { .proof { grid-template-columns:1fr 1fr; } }
+  .proof > div { border:1px solid var(--line); border-left-width:4px; border-radius:8px; padding:8px 12px; background:var(--card); font-size:.9rem; }
+  .proof .yes { border-left-color:var(--ok); }
+  .proof .no { border-left-color:var(--warn); }
+  .proof strong { display:block; margin-bottom:2px; }
+  .changed { font-weight:700; }
+  .finish { margin-top:14px; padding:12px; border:1px solid var(--ok); border-radius:10px; background:var(--okbg); color:var(--ok); }
+  a.btn { display:inline-flex; align-items:center; min-height:44px; padding:10px 14px; font-weight:600; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--fg); text-decoration:none; }
+  .finish:focus { outline:none; }
+  a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+  @media (prefers-reduced-motion: reduce) { .bar > span { transition:none; } }
+  @media (max-width:420px) { .tabs button { font-size:.85rem; padding:12px 4px; } main { padding:16px 12px 40px; } }
 </style>
 </head>
 <body>
 <main>
-  <h1>Receipt verifier</h1>
-  <p class="lead">Check an agent's receipts against Hyperliquid's public record, or check an approval-seal record. Everything runs in your browser. No login, no server of ours.</p>
+  <h1>approval-seal</h1>
+  <p class="lead">Sealed, expiring, single-use approvals for AI agent actions, plus a receipt checker. Take the 2 minute guided demo, check receipts against Hyperliquid's public record, or verify a record yourself. Everything runs in your browser. No login, no server of ours. <a href="https://github.com/Abelhubprog/approval-seal">Source on GitHub</a>.</p>
 
-  <div class="tabs" role="tablist">
-    <button role="tab" id="tab-receipts" aria-selected="true" aria-controls="panel-receipts">Hyperliquid receipts</button>
-    <button role="tab" id="tab-seal" aria-selected="false" aria-controls="panel-seal">Approval seal</button>
+  <div class="tabs" role="tablist" aria-label="Sections">
+    <button role="tab" id="tab-demo" aria-selected="true" aria-controls="panel-demo" tabindex="0">Demo</button>
+    <button role="tab" id="tab-receipts" aria-selected="false" aria-controls="panel-receipts" tabindex="-1">Hyperliquid receipts</button>
+    <button role="tab" id="tab-seal" aria-selected="false" aria-controls="panel-seal" tabindex="-1">Approval seal</button>
   </div>
 
-  <section id="panel-receipts" role="tabpanel" aria-labelledby="tab-receipts">
+  <section id="panel-demo" class="demo" role="tabpanel" aria-labelledby="tab-demo">
+    <div class="banner">EXAMPLE DATA: the order, the approver and the approval in steps 1 to 6 are made up and generated in your browser. No trade is placed.</div>
+    <div class="demo-top">
+      <p class="count" id="demo-count" aria-live="polite">Step 1 of 7: Agent proposes</p>
+      <button class="btn" type="button" id="demo-reset">Reset</button>
+    </div>
+    <div class="bar" id="demo-bar" role="progressbar" aria-label="Demo progress" aria-valuemin="0" aria-valuemax="7" aria-valuenow="0"><span></span></div>
+    <ol class="dots" id="demo-dots" aria-label="Demo steps"></ol>
+
+      <section class="step" id="step-1" aria-labelledby="step-1-h">
+        <h2 id="step-1-h" tabindex="-1">1. Agent proposes</h2>
+        <p class="what">An AI agent wants to buy a little ETH on Hyperliquid. It writes the order down as plain data. Nothing is signed and nothing is sent anywhere.</p>
+        <div class="banner">EXAMPLE DATA: this order is made up for the demo. It is not a real trade and is never sent to any venue.</div>
+        <div class="row"><button class="btn primary" type="button" id="do-1">Show the proposed order</button></div>
+        <div class="out" id="out-1" role="status" aria-live="polite"></div>
+        <div class="proof">
+          <div class="yes"><strong>What this proves</strong>Only what the agent asked for, in a form that can be hashed.</div>
+          <div class="no"><strong>What it does not prove</strong>That anyone has agreed to it. This is a proposal, not a trade.</div>
+        </div>
+        <div class="stepnav">
+          <button class="btn back" type="button" data-back="1" hidden>Back</button>
+          <button class="btn primary next" type="button" data-next="1" disabled>Next step</button>
+        </div>
+      </section>
+
+      <section class="step" id="step-2" aria-labelledby="step-2-h" hidden>
+        <h2 id="step-2-h" tabindex="-1">2. Owner approves</h2>
+        <p class="what">You click approve. approval-seal binds this exact order to the approval with a SHA-256 seal. The seal is stored separately, the way an approval service would keep it.</p>
+        <div class="row"><button class="btn primary" type="button" id="do-2">Approve and seal</button></div>
+        <div class="out" id="out-2" role="status" aria-live="polite"></div>
+        <div class="proof">
+          <div class="yes"><strong>What this proves</strong>The order, the approver name, the time, the nonce and the expiry are fixed as of this moment.</div>
+          <div class="no"><strong>What it does not prove</strong>Who approved. The approver is just a name in version 0.1.0. There is no signature or key.</div>
+        </div>
+        <div class="stepnav">
+          <button class="btn back" type="button" data-back="2">Back</button>
+          <button class="btn primary next" type="button" data-next="2" disabled>Next step</button>
+        </div>
+      </section>
+
+      <section class="step" id="step-3" aria-labelledby="step-3-h" hidden>
+        <h2 id="step-3-h" tabindex="-1">3. Anyone verifies</h2>
+        <p class="what">Anyone holding the record and the stored seal can recompute the hashes in their own browser and check them.</p>
+        <div class="row"><button class="btn primary" type="button" id="do-3">Verify the record</button></div>
+        <div class="out" id="out-3" role="status" aria-live="polite"></div>
+        <div class="proof">
+          <div class="yes"><strong>What this proves</strong>The record is unchanged since it was sealed, it matches the stored seal, and it has not expired.</div>
+          <div class="no"><strong>What it does not prove</strong>Who approved, whether the trade is a good idea, or whether it is safe or profitable.</div>
+        </div>
+        <div class="stepnav">
+          <button class="btn back" type="button" data-back="3">Back</button>
+          <button class="btn primary next" type="button" data-next="3" disabled>Next step</button>
+        </div>
+      </section>
+
+      <section class="step" id="step-4" aria-labelledby="step-4-h" hidden>
+        <h2 id="step-4-h" tabindex="-1">4. Tamper</h2>
+        <p class="what">Now an attacker edits the approved order after the fact. Pick one change. Each button edits a copy of the record and verifies it again.</p>
+        <div class="row"><button class="btn danger" type="button" id="do-4a">Change the amount: 0.0100 to 10.0000</button><button class="btn danger" type="button" id="do-4b">Change the venue</button></div>
+        <div class="out" id="out-4" role="status" aria-live="polite"></div>
+        <div class="proof">
+          <div class="yes"><strong>What this proves</strong>Any edit to the approved order is caught, and the check names the field that changed.</div>
+          <div class="no"><strong>What it does not prove</strong>That the executor sends the approved order. Your executor must send exactly the approved action and nothing else.</div>
+        </div>
+        <div class="stepnav">
+          <button class="btn back" type="button" data-back="4">Back</button>
+          <button class="btn primary next" type="button" data-next="4" disabled>Next step</button>
+        </div>
+      </section>
+
+      <section class="step" id="step-5" aria-labelledby="step-5-h" hidden>
+        <h2 id="step-5-h" tabindex="-1">5. Forge attempt</h2>
+        <p class="what">A smarter attacker changes the amount and also recomputes the hashes so the record looks consistent. Does it get through?</p>
+        <div class="row"><button class="btn danger" type="button" id="do-5">Forge it: edit and recompute the hashes</button></div>
+        <div class="out" id="out-5" role="status" aria-live="polite"></div>
+        <div class="proof">
+          <div class="yes"><strong>What this proves</strong>A forged record can look self-consistent, but it cannot match the seal that was stored at approval time.</div>
+          <div class="no"><strong>What it does not prove</strong>Protection if the attacker can also overwrite the stored seal. Keep it where they cannot write.</div>
+        </div>
+        <div class="stepnav">
+          <button class="btn back" type="button" data-back="5">Back</button>
+          <button class="btn primary next" type="button" data-next="5" disabled>Next step</button>
+        </div>
+      </section>
+
+      <section class="step" id="step-6" aria-labelledby="step-6-h" hidden>
+        <h2 id="step-6-h" tabindex="-1">6. Replay</h2>
+        <p class="what">An approval is single use. The executor claims it once to run the order. What if the same approval is used a second time?</p>
+        <div class="row"><button class="btn danger" type="button" id="do-6">Claim the same approval twice</button></div>
+        <div class="out" id="out-6" role="status" aria-live="polite"></div>
+        <div class="proof">
+          <div class="yes"><strong>What this proves</strong>The same approver and nonce cannot be claimed twice by executors that share one store.</div>
+          <div class="no"><strong>What it does not prove</strong>Replay protection across machines. This demo store lives in your tab. Real use needs a shared database constraint.</div>
+        </div>
+        <div class="stepnav">
+          <button class="btn back" type="button" data-back="6">Back</button>
+          <button class="btn primary next" type="button" data-next="6" disabled>Next step</button>
+        </div>
+      </section>
+
+      <section class="step" id="step-7" aria-labelledby="step-7-h" hidden>
+        <h2 id="step-7-h" tabindex="-1">7. Check the public record</h2>
+        <p class="what">The sealed order maps to a Hyperliquid client order id, so a public order can point back to its approval. This step derives that id, then runs the same receipts check as the Hyperliquid receipts tab, against real public orders.</p>
+        <div class="banner">EXAMPLE DATA: the receipts below are real public orders from a third-party wallet. They are not PROWZI receipts and were not made with approval-seal.</div>
+        <div class="row"><button class="btn primary" type="button" id="do-7">Check the public record</button></div>
+        <div class="out" id="out-7" role="status" aria-live="polite"></div>
+        <div class="proof">
+          <div class="yes"><strong>What this proves</strong>Hyperliquid's own public API reports filled orders with those ids for that wallet. No login.</div>
+          <div class="no"><strong>What it does not prove</strong>Who approved a trade, that it was a good idea, or that it was safe or profitable. These are not PROWZI receipts.</div>
+        </div>
+        <div class="stepnav">
+          <button class="btn back" type="button" data-back="7">Back</button>
+          <button class="btn primary next" type="button" data-next="7" disabled>Finish</button>
+        </div>
+      </section>
+
+    <div class="finish" id="demo-finish" tabindex="-1" hidden>
+      <strong>That is the whole idea.</strong> Any change to an approved action is caught, forged records fail against the stored seal, and each approval works once. The seal proves the record is unchanged since sealing. It does not prove who approved, and says nothing about profit or safety.
+      <div class="row">
+        <button class="btn" type="button" id="demo-own">Check your own receipts</button>
+        <a class="btn" href="https://github.com/Abelhubprog/approval-seal">View the repo</a>
+        <button class="btn" type="button" id="demo-again">Run the demo again</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="panel-receipts" role="tabpanel" aria-labelledby="tab-receipts" hidden>
     <label for="wallet">Wallet address</label>
     <input type="text" id="wallet" placeholder="0x plus 40 hex characters" autocomplete="off" spellcheck="false">
     <p class="hint">Use the account address that owns the orders, not an agent or API wallet.</p>
@@ -104,6 +269,8 @@
 </main>
 <script src="approval-seal.js"></script>
 <script src="receipts.js"></script>
+<script src="demo-steps.js"></script>
 <script src="app.js"></script>
+<script src="demo.js"></script>
 </body>
 </html>
